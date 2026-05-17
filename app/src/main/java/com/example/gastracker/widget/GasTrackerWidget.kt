@@ -81,30 +81,22 @@ class GasTrackerCompactWidget : GlanceAppWidget() {
                 .background(WidgetBackground)
                 .padding(horizontal = 6.dp, vertical = 8.dp)
                 .clickable(actionStartActivity<MainActivity>()),
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.CenterVertically,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Image(
                 provider = ImageProvider(R.drawable.ic_widget_pump),
                 contentDescription = null,
                 colorFilter = ColorFilter.tint(ColorProvider(AccentColor)),
-                modifier = GlanceModifier.size(20.dp),
+                modifier = GlanceModifier.size(22.dp),
             )
-            Spacer(modifier = GlanceModifier.height(3.dp))
+            Spacer(modifier = GlanceModifier.height(4.dp))
             Text(
                 text = if (snap.count == 0) "—" else formatDollarsRounded(snap.totalCents),
                 style = TextStyle(
-                    fontSize = 20.sp,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = ColorProvider(AccentColor),
-                    textAlign = TextAlign.Center,
-                ),
-            )
-            Text(
-                text = "this month",
-                style = TextStyle(
-                    fontSize = 9.sp,
-                    color = ColorProvider(LabelColor),
                     textAlign = TextAlign.Center,
                 ),
             )
@@ -126,7 +118,7 @@ class GasTrackerWideWidget : GlanceAppWidget() {
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(WidgetBackground)
-                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
                 .clickable(actionStartActivity<MainActivity>()),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -134,7 +126,7 @@ class GasTrackerWideWidget : GlanceAppWidget() {
                 provider = ImageProvider(R.drawable.ic_widget_pump),
                 contentDescription = null,
                 colorFilter = ColorFilter.tint(ColorProvider(AccentColor)),
-                modifier = GlanceModifier.size(38.dp),
+                modifier = GlanceModifier.size(40.dp),
             )
             Spacer(modifier = GlanceModifier.width(12.dp))
             Column(
@@ -144,30 +136,16 @@ class GasTrackerWideWidget : GlanceAppWidget() {
                     Text(
                         text = "No fill-ups",
                         style = TextStyle(
-                            fontSize = 20.sp,
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.Medium,
                             color = ColorProvider(ValueColor),
                         ),
                     )
-                    Text(
-                        text = "this month",
-                        style = TextStyle(
-                            fontSize = 13.sp,
-                            color = ColorProvider(LabelColor),
-                        ),
-                    )
                 } else {
-                    Text(
-                        text = "This month",
-                        style = TextStyle(
-                            fontSize = 13.sp,
-                            color = ColorProvider(LabelColor),
-                        ),
-                    )
                     Text(
                         text = formatDollarsRounded(snap.totalCents),
                         style = TextStyle(
-                            fontSize = 32.sp,
+                            fontSize = 34.sp,
                             fontWeight = FontWeight.Bold,
                             color = ColorProvider(AccentColor),
                         ),
