@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ data extraction rules (referenced via android:dataExtractionRules).
+  Cloud backup (Google Drive) and device-to-device transfer both include the
+  Room database and shared prefs, but skip the cache directory used for CSV
+  exports.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="database" path="." />
+        <include domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="cache" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="database" path="." />
+        <include domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+        <exclude domain="cache" path="." />
+    </device-transfer>
+</data-extraction-rules>

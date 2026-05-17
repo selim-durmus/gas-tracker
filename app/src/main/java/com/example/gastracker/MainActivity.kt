@@ -4,6 +4,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -91,7 +99,13 @@ private fun GasTrackerNav(repository: FillUpRepository) {
                 .padding(scaffoldPadding)
                 .consumeWindowInsets(scaffoldPadding),
         ) {
-            composable(TopLevelDestination.Log.route) {
+            composable(
+                route = TopLevelDestination.Log.route,
+                enterTransition = { fadeThroughEnter() },
+                exitTransition = { fadeThroughExit() },
+                popEnterTransition = { fadeThroughEnter() },
+                popExitTransition = { fadeThroughExit() },
+            ) {
                 val fillUps by viewModel.fillUpsWithEfficiency.collectAsState()
                 FillUpListScreen(
                     fillUps = fillUps,
@@ -109,7 +123,13 @@ private fun GasTrackerNav(repository: FillUpRepository) {
                     onUndoExpired = viewModel::consumeLastDeleted,
                 )
             }
-            composable(TopLevelDestination.Stats.route) {
+            composable(
+                route = TopLevelDestination.Stats.route,
+                enterTransition = { fadeThroughEnter() },
+                exitTransition = { fadeThroughExit() },
+                popEnterTransition = { fadeThroughEnter() },
+                popExitTransition = { fadeThroughExit() },
+            ) {
                 val fillUps by viewModel.fillUps.collectAsState()
                 val history by viewModel.history.collectAsState()
                 val lifetime by viewModel.lifetime.collectAsState()
@@ -125,6 +145,20 @@ private fun GasTrackerNav(repository: FillUpRepository) {
                     type = NavType.LongType
                     defaultValue = -1L
                 }),
+                enterTransition = {
+                    slideInVertically(
+                        initialOffsetY = { fullHeight -> fullHeight },
+                        animationSpec = tween(durationMillis = 300),
+                    ) + fadeIn(animationSpec = tween(durationMillis = 200))
+                },
+                exitTransition = { fadeOut(animationSpec = tween(durationMillis = 150)) },
+                popEnterTransition = { fadeIn(animationSpec = tween(durationMillis = 150)) },
+                popExitTransition = {
+                    slideOutVertically(
+                        targetOffsetY = { fullHeight -> fullHeight },
+                        animationSpec = tween(durationMillis = 300),
+                    ) + fadeOut(animationSpec = tween(durationMillis = 200))
+                },
             ) { backStackEntry ->
                 val id = backStackEntry.arguments?.getLong("id") ?: -1L
                 val isNew = id <= 0L
@@ -173,3 +207,17 @@ private fun BottomBar(navController: NavHostController, currentRoute: String?) {
         }
     }
 }
+
+private fun AnimatedContentTransitionScope<*>.fadeThroughEnter() =
+    fadeIn(animationSpec = tween(durationMillis = 220, delayMillis = 90)) +
+        scaleIn(
+            initialScale = 0.96f,
+            animationSpec = tween(durationMillis = 220, delayMillis = 90),
+        )
+
+private fun AnimatedContentTransitionScope<*>.fadeThroughExit() =
+    fadeOut(animationSpec = tween(durationMillis = 90)) +
+        scaleOut(
+            targetScale = 0.96f,
+            animationSpec = tween(durationMillis = 90),
+        )

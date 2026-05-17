@@ -13,10 +13,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Scaffold
@@ -39,9 +41,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import com.example.gastracker.data.FillUp
 import com.example.gastracker.data.FillUpWithEfficiency
 import com.example.gastracker.data.formatPrice
+import com.example.gastracker.data.shareCsvExport
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.format.DateTimeFormatter
@@ -65,6 +69,7 @@ fun FillUpListScreen(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val deleted by lastDeleted.collectAsState()
+    val context = LocalContext.current
 
     LaunchedEffect(deleted) {
         if (deleted == null) return@LaunchedEffect
@@ -87,6 +92,18 @@ fun FillUpListScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Gas Tracker", fontWeight = FontWeight.SemiBold) },
+                actions = {
+                    if (fillUps.isNotEmpty()) {
+                        IconButton(onClick = {
+                            shareCsvExport(context, fillUps.map { it.fillUp })
+                        }) {
+                            Icon(
+                                imageVector = Icons.Filled.IosShare,
+                                contentDescription = "Export CSV",
+                            )
+                        }
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     titleContentColor = MaterialTheme.colorScheme.primary,
                 ),
