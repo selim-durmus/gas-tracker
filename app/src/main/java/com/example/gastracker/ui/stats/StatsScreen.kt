@@ -25,8 +25,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -90,7 +91,14 @@ fun StatsScreen(
     lifetime: LifetimeSummary,
 ) {
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Stats") }) },
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text("Stats", fontWeight = FontWeight.SemiBold) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    titleContentColor = MaterialTheme.colorScheme.primary,
+                ),
+            )
+        },
     ) { innerPadding ->
         if (fillUps.isEmpty()) {
             Box(
