@@ -3,4 +3,5 @@
     <string name="app_name">Gas Tracker</string>
     <string name="widget_compact_description">Gas Tracker (compact) — this month\'s total</string>
     <string name="widget_wide_description">Gas Tracker (wide) — this month\'s total and litres</string>
+    <string name="widget_efficiency_description">Gas Tracker (efficiency) — this month\'s total with L/100km</string>
 </resources>

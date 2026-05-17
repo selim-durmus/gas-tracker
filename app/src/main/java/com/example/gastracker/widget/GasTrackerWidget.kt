@@ -32,6 +32,7 @@ import androidx.glance.unit.ColorProvider
 import com.example.gastracker.GasTrackerApp
 import com.example.gastracker.MainActivity
 import com.example.gastracker.R
+import com.example.gastracker.data.toLifetimeSummary
 import com.example.gastracker.ui.theme.Gold
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
@@ -41,6 +42,7 @@ private data class WidgetSnapshot(
     val totalCents: Long,
     val totalLitres: Double,
     val count: Int,
+    val lifetimeLper100km: Double?,
 )
 
 private suspend fun fetchThisMonth(context: Context): WidgetSnapshot {
@@ -52,12 +54,10 @@ private suspend fun fetchThisMonth(context: Context): WidgetSnapshot {
         totalCents = monthEntries.sumOf { it.totalCostCents },
         totalLitres = monthEntries.sumOf { it.litres },
         count = monthEntries.size,
+        lifetimeLper100km = allEntries.toLifetimeSummary().avgLper100km,
     )
 }
 
-// Whole-dollar display — no decimals. Keeps the headline short enough to fit in
-// the 1x1 widget and feels cleaner on the 2x1 too. We round to nearest dollar
-// rather than truncate so a $52.60 fill-up shows as $53, not $52.
 private fun formatDollarsRounded(cents: Long): String = "$${Math.round(cents / 100.0)}"
 
 private val WidgetBackground: Color = Color.Black
@@ -114,48 +114,82 @@ class GasTrackerWideWidget : GlanceAppWidget() {
 
     @Composable
     private fun WideContent(snap: WidgetSnapshot) {
-        Row(
-            modifier = GlanceModifier
-                .fillMaxSize()
-                .background(WidgetBackground)
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .clickable(actionStartActivity<MainActivity>()),
+        WideLayout(
+            snap = snap,
+            subtitle = if (snap.count == 0) null
+                else "${"%.1f".format(snap.totalLitres)} L · ${snap.count}",
+        )
+    }
+}
+
+class GasTrackerEfficiencyWidget : GlanceAppWidget() {
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val snap = fetchThisMonth(context)
+        provideContent {
+            EfficiencyContent(snap)
+        }
+    }
+
+    @Composable
+    private fun EfficiencyContent(snap: WidgetSnapshot) {
+        val subtitle = when {
+            snap.count == 0 -> null
+            snap.lifetimeLper100km != null ->
+                "${"%.1f".format(snap.lifetimeLper100km)} L/100km"
+            else -> "${"%.1f".format(snap.totalLitres)} L"
+        }
+        WideLayout(snap = snap, subtitle = subtitle)
+    }
+}
+
+@Composable
+private fun WideLayout(snap: WidgetSnapshot, subtitle: String?) {
+    Row(
+        modifier = GlanceModifier
+            .fillMaxSize()
+            .background(WidgetBackground)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .clickable(actionStartActivity<MainActivity>()),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Image(
+            provider = ImageProvider(R.drawable.ic_widget_pump),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(ColorProvider(AccentColor)),
+            modifier = GlanceModifier.size(40.dp),
+        )
+        Spacer(modifier = GlanceModifier.width(12.dp))
+        Column(
             verticalAlignment = Alignment.CenterVertically,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Image(
-                provider = ImageProvider(R.drawable.ic_widget_pump),
-                contentDescription = null,
-                colorFilter = ColorFilter.tint(ColorProvider(AccentColor)),
-                modifier = GlanceModifier.size(40.dp),
-            )
-            Spacer(modifier = GlanceModifier.width(12.dp))
-            Column(
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (snap.count == 0) {
+            if (snap.count == 0) {
+                Text(
+                    text = "No fill-ups",
+                    style = TextStyle(
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = ColorProvider(ValueColor),
+                        textAlign = TextAlign.Center,
+                    ),
+                )
+            } else {
+                Text(
+                    text = formatDollarsRounded(snap.totalCents),
+                    style = TextStyle(
+                        fontSize = 34.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = ColorProvider(AccentColor),
+                        textAlign = TextAlign.Center,
+                    ),
+                )
+                if (subtitle != null) {
                     Text(
-                        text = "No fill-ups",
+                        text = subtitle,
                         style = TextStyle(
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = ColorProvider(ValueColor),
-                        ),
-                    )
-                } else {
-                    Text(
-                        text = formatDollarsRounded(snap.totalCents),
-                        style = TextStyle(
-                            fontSize = 34.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = ColorProvider(AccentColor),
-                        ),
-                    )
-                    Text(
-                        text = "${"%.1f".format(snap.totalLitres)} L · " +
-                            "${snap.count} fill-up${if (snap.count == 1) "" else "s"}",
-                        style = TextStyle(
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             color = ColorProvider(LabelColor),
+                            textAlign = TextAlign.Center,
                         ),
                     )
                 }

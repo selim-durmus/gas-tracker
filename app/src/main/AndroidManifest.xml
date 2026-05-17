@@ -54,6 +54,18 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/gas_tracker_widget_wide" />
         </receiver>
+
+        <receiver
+            android:name=".widget.GasTrackerEfficiencyWidgetReceiver"
+            android:label="Gas Tracker (efficiency)"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/gas_tracker_widget_efficiency" />
+        </receiver>
     </application>
 
 </manifest>

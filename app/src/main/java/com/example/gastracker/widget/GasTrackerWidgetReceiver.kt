@@ -10,3 +10,7 @@ class GasTrackerCompactWidgetReceiver : GlanceAppWidgetReceiver() {
 class GasTrackerWideWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = GasTrackerWideWidget()
 }
+
+class GasTrackerEfficiencyWidgetReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = GasTrackerEfficiencyWidget()
+}
