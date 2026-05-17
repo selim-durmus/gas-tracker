@@ -1,0 +1,38 @@
+# Gradle
+.gradle/
+build/
+**/build/
+!**/src/**/build/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.cxx/
+captures/
+
+# Local config (SDK path, user-specific)
+local.properties
+
+# Keystores and signing
+*.jks
+*.keystore
+keystore.properties
+
+# Generated
+*.apk
+*.aab
+*.aar
+*.ap_
+*.dex
+*.class
+
+# Logs and crash reports
+*.log
+hs_err_pid*
+
+# macOS / system
+.DS_Store
+Thumbs.db
+
+# Memory / scratch (not for repo)
+.claude/
