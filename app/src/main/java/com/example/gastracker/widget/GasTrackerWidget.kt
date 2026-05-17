@@ -2,6 +2,8 @@ package com.example.gastracker.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -18,34 +20,99 @@ import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
+import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
-import androidx.glance.unit.ColorProvider
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.gastracker.GasTrackerApp
 import com.example.gastracker.MainActivity
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import java.time.YearMonth
 
-class GasTrackerWidget : GlanceAppWidget() {
+private data class WidgetSnapshot(
+    val totalCents: Long,
+    val totalLitres: Double,
+    val count: Int,
+)
 
+private suspend fun fetchThisMonth(context: Context): WidgetSnapshot {
+    val repository = (context.applicationContext as GasTrackerApp).repository
+    val allEntries = repository.observeAll().first()
+    val ym = YearMonth.from(LocalDate.now())
+    val monthEntries = allEntries.filter { YearMonth.from(it.date) == ym }
+    return WidgetSnapshot(
+        totalCents = monthEntries.sumOf { it.totalCostCents },
+        totalLitres = monthEntries.sumOf { it.litres },
+        count = monthEntries.size,
+    )
+}
+
+private fun formatDollars(cents: Long): String = "$%.2f".format(cents / 100.0)
+
+class GasTrackerCompactWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val repository = (context.applicationContext as GasTrackerApp).repository
-        val allEntries = repository.observeAll().first()
-        val ym = YearMonth.from(LocalDate.now())
-        val monthEntries = allEntries.filter { YearMonth.from(it.date) == ym }
-        val totalCents = monthEntries.sumOf { it.totalCostCents }
-        val totalLitres = monthEntries.sumOf { it.litres }
-        val count = monthEntries.size
-
+        val snap = fetchThisMonth(context)
         provideContent {
-            WidgetContent(totalCents = totalCents, totalLitres = totalLitres, count = count)
+            CompactContent(snap)
         }
     }
 
     @Composable
-    private fun WidgetContent(totalCents: Long, totalLitres: Double, count: Int) {
+    private fun CompactContent(snap: WidgetSnapshot) {
+        GlanceTheme {
+            Column(
+                modifier = GlanceModifier
+                    .fillMaxSize()
+                    .background(GlanceTheme.colors.surface)
+                    .padding(8.dp)
+                    .clickable(actionStartActivity<MainActivity>()),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                if (snap.count == 0) {
+                    Text(
+                        text = "—",
+                        style = TextStyle(
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GlanceTheme.colors.primary,
+                            textAlign = TextAlign.Center,
+                        ),
+                    )
+                } else {
+                    Text(
+                        text = formatDollars(snap.totalCents),
+                        style = TextStyle(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GlanceTheme.colors.primary,
+                            textAlign = TextAlign.Center,
+                        ),
+                    )
+                }
+                Spacer(modifier = GlanceModifier.height(2.dp))
+                Text(
+                    text = "this month",
+                    style = TextStyle(
+                        fontSize = 10.sp,
+                        color = GlanceTheme.colors.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+class GasTrackerWideWidget : GlanceAppWidget() {
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val snap = fetchThisMonth(context)
+        provideContent {
+            WideContent(snap)
+        }
+    }
+
+    @Composable
+    private fun WideContent(snap: WidgetSnapshot) {
         GlanceTheme {
             Column(
                 modifier = GlanceModifier
@@ -58,14 +125,14 @@ class GasTrackerWidget : GlanceAppWidget() {
                 Text(
                     text = "This month",
                     style = TextStyle(
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         color = GlanceTheme.colors.onSurfaceVariant,
                     ),
                 )
-                Spacer(modifier = GlanceModifier.height(4.dp))
-                if (count == 0) {
+                Spacer(modifier = GlanceModifier.height(2.dp))
+                if (snap.count == 0) {
                     Text(
-                        text = "No fill-ups yet",
+                        text = "No fill-ups",
                         style = TextStyle(
                             fontSize = 16.sp,
                             color = GlanceTheme.colors.onSurface,
@@ -73,19 +140,19 @@ class GasTrackerWidget : GlanceAppWidget() {
                     )
                 } else {
                     Text(
-                        text = "$%.2f".format(totalCents / 100.0),
+                        text = formatDollars(snap.totalCents),
                         style = TextStyle(
-                            fontSize = 24.sp,
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
-                            color = GlanceTheme.colors.onSurface,
+                            color = GlanceTheme.colors.primary,
                         ),
                     )
                     Spacer(modifier = GlanceModifier.height(2.dp))
                     Text(
-                        text = "${"%.1f".format(totalLitres)} L · " +
-                            "$count fill-up${if (count == 1) "" else "s"}",
+                        text = "${"%.1f".format(snap.totalLitres)} L · " +
+                            "${snap.count} fill-up${if (snap.count == 1) "" else "s"}",
                         style = TextStyle(
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             color = GlanceTheme.colors.onSurfaceVariant,
                         ),
                     )

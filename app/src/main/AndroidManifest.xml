@@ -32,14 +32,27 @@
         </provider>
 
         <receiver
-            android:name=".widget.GasTrackerWidgetReceiver"
+            android:name=".widget.GasTrackerCompactWidgetReceiver"
+            android:label="Gas Tracker (compact)"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/gas_tracker_widget_info" />
+                android:resource="@xml/gas_tracker_widget_compact" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.GasTrackerWideWidgetReceiver"
+            android:label="Gas Tracker (wide)"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/gas_tracker_widget_wide" />
         </receiver>
     </application>
 

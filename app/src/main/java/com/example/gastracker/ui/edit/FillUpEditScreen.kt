@@ -106,6 +106,7 @@ fun FillUpEditScreen(
                 prefix = "$",
                 suffix = "/L",
                 maxDecimals = 3,
+                autoDecimalAfter = 1,
                 isError = state.priceError,
                 errorText = "Enter a valid amount",
                 parsedPreview = Money.fromInput(state.priceInput)
@@ -119,6 +120,7 @@ fun FillUpEditScreen(
                 prefix = "$",
                 suffix = null,
                 maxDecimals = 2,
+                autoDecimalAfter = null,
                 isError = state.totalError,
                 errorText = "Enter a valid amount",
                 parsedPreview = Money.fromInput(state.totalInput)?.format()?.let { "= $it" },
@@ -207,13 +209,16 @@ private fun DecimalTextField(
     prefix: String?,
     suffix: String?,
     maxDecimals: Int,
+    autoDecimalAfter: Int?,
     isError: Boolean,
     errorText: String,
     parsedPreview: String?,
 ) {
     OutlinedTextField(
         value = value,
-        onValueChange = { raw -> onValueChange(sanitizeDecimal(raw, maxDecimals)) },
+        onValueChange = { raw ->
+            onValueChange(sanitizeDecimal(raw, maxDecimals, autoDecimalAfter))
+        },
         label = { Text(label) },
         prefix = prefix?.let { { Text(it) } },
         suffix = suffix?.let { { Text(it) } },
@@ -257,10 +262,23 @@ private fun IntegerTextField(
     )
 }
 
-private fun sanitizeDecimal(raw: String, maxDecimals: Int): String {
+private fun sanitizeDecimal(
+    raw: String,
+    maxDecimals: Int,
+    autoDecimalAfter: Int? = null,
+): String {
     val filtered = raw.filter { it.isDigit() || it == '.' }
     val firstDot = filtered.indexOf('.')
-    if (firstDot < 0) return filtered.take(8)
+
+    if (firstDot < 0) {
+        if (autoDecimalAfter != null && filtered.length > autoDecimalAfter) {
+            val intPart = filtered.take(autoDecimalAfter)
+            val decPart = filtered.drop(autoDecimalAfter).take(maxDecimals)
+            return "$intPart.$decPart"
+        }
+        return filtered.take(8)
+    }
+
     val intPart = filtered.substring(0, firstDot).take(8)
     val rest = filtered.substring(firstDot + 1).replace(".", "")
     return intPart + "." + rest.take(maxDecimals)
