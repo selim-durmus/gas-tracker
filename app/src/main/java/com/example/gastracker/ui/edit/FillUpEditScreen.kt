@@ -28,12 +28,15 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.example.gastracker.data.Money
 import com.example.gastracker.ui.EditState
@@ -214,10 +217,32 @@ private fun DecimalTextField(
     errorText: String,
     parsedPreview: String?,
 ) {
+    var fieldValue by remember {
+        mutableStateOf(TextFieldValue(value, TextRange(value.length)))
+    }
+
+    // Reset when the parent's value changes from outside (e.g., loading an existing
+    // entry, startNew prefill) — but NOT on every user keystroke (which we already
+    // mirror back through onValueChange).
+    LaunchedEffect(value) {
+        if (value != fieldValue.text) {
+            fieldValue = TextFieldValue(value, TextRange(value.length))
+        }
+    }
+
     OutlinedTextField(
-        value = value,
-        onValueChange = { raw ->
-            onValueChange(sanitizeDecimal(raw, maxDecimals, autoDecimalAfter))
+        value = fieldValue,
+        onValueChange = { newField ->
+            val sanitized = sanitizeDecimal(newField.text, maxDecimals, autoDecimalAfter)
+            val newSelection = if (sanitized.length != newField.text.length) {
+                // Auto-formatting inserted/removed a character — cursor to the end
+                TextRange(sanitized.length)
+            } else {
+                // No structural change — let the user's cursor stay where they put it
+                newField.selection
+            }
+            fieldValue = TextFieldValue(sanitized, newSelection)
+            onValueChange(sanitized)
         },
         label = { Text(label) },
         prefix = prefix?.let { { Text(it) } },
