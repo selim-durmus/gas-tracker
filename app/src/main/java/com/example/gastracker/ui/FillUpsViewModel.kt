@@ -82,13 +82,11 @@ class FillUpsViewModel(private val repository: FillUpRepository) : ViewModel() {
     val editState: StateFlow<EditState> = _editState.asStateFlow()
 
     fun startNew() {
-        val lastEntry = fillUps.value.firstOrNull()
         val today = LocalDate.now()
-        val pricePrefill = lastEntry?.let { "%.3f".format(it.pricePerLiterCents / 100.0) } ?: ""
-        val snapshot = InitialSnapshot(today, pricePrefill, "", "")
+        // No price prefill — gas prices change constantly, so the field starts blank.
+        val snapshot = InitialSnapshot(today, "", "", "")
         _editState.value = EditState(
             date = today,
-            priceInput = pricePrefill,
             initial = snapshot,
         )
     }

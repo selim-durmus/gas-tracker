@@ -44,10 +44,10 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
+// Pattern-only ofPattern uses the default FORMAT locale at creation.
 private val dateFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.getDefault())
+    DateTimeFormatter.ofPattern("MMMM d, yyyy")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -154,7 +154,8 @@ fun FillUpEditScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "Odometer is optional but unlocks fuel-efficiency stats. Edit any time from the list.",
+                "Odometer is optional but unlocks fuel-efficiency stats. Leave it blank for a " +
+                    "partial fill — that entry is skipped and its fuel rolls into the next reading.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

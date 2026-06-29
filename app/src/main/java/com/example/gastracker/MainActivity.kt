@@ -131,10 +131,12 @@ private fun GasTrackerNav(repository: FillUpRepository) {
                 popExitTransition = { fadeThroughExit() },
             ) {
                 val fillUps by viewModel.fillUps.collectAsState()
+                val efficiency by viewModel.fillUpsWithEfficiency.collectAsState()
                 val history by viewModel.history.collectAsState()
                 val lifetime by viewModel.lifetime.collectAsState()
                 StatsScreen(
                     fillUps = fillUps,
+                    efficiency = efficiency,
                     history = history,
                     lifetime = lifetime,
                 )

@@ -39,7 +39,15 @@ data class LifetimeSummary(
 data class FillUpWithEfficiency(
     val fillUp: FillUp,
     val lPer100km: Double?,
-)
+    /**
+     * How many fill-ups' fuel is included in this efficiency reading. 1 for a clean
+     * tank-to-tank reading; >1 when one or more partial fills (no odometer) were folded into
+     * the interval, in which case the value is an average over a combined span.
+     */
+    val fillsCovered: Int = 1,
+) {
+    val isCombined: Boolean get() = lPer100km != null && fillsCovered > 1
+}
 
 data class HistorySection(
     val year: YearSummary,
@@ -80,25 +88,66 @@ fun List<FillUp>.toHistorySections(): List<HistorySection> {
 @Suppress("unused")
 fun Month.shortName(): String = name.lowercase().replaceFirstChar { it.uppercase() }.take(3)
 
+/**
+ * One fuel-efficiency measurement: the distance covered since the previous fill-up that
+ * recorded an odometer reading, and the litres burned over that distance.
+ *
+ * Efficiency is measured tank-to-tank. A fill-up with no odometer reading is treated as a
+ * partial fill: it does not produce its own measurement, and its litres are carried forward
+ * into the next fill-up that does record an odometer (so no fuel is lost from the average).
+ * This lets the user simply omit the odometer to skip a noisy entry without breaking the
+ * next entry's efficiency.
+ */
+private data class EfficiencySegment(
+    val fillUpId: Long,
+    val distanceKm: Long,
+    val litres: Double,
+    val fillsCovered: Int,
+) {
+    val lPer100km: Double get() = litres / distanceKm * 100.0
+}
+
+private fun List<FillUp>.efficiencySegments(): List<EfficiencySegment> {
+    // Deterministic order: by date, then by id to break same-day ties consistently.
+    val sortedAsc = sortedWith(compareBy({ it.dateEpochDay }, { it.id }))
+    val segments = ArrayList<EfficiencySegment>()
+    var lastOdo: Long? = null
+    var pendingLitres = 0.0
+    var pendingCount = 0
+    for (entry in sortedAsc) {
+        val currOdo = entry.odometerKm
+        if (currOdo == null) {
+            // No odometer: fold this fill's fuel into the next measured interval.
+            pendingLitres += entry.litres
+            pendingCount += 1
+            continue
+        }
+        val prevOdo = lastOdo
+        if (prevOdo != null && currOdo > prevOdo) {
+            segments += EfficiencySegment(
+                fillUpId = entry.id,
+                distanceKm = currOdo - prevOdo,
+                litres = entry.litres + pendingLitres,
+                fillsCovered = pendingCount + 1,
+            )
+        }
+        // Advance the baseline whenever we have a reading (even on a non-increasing
+        // odometer, e.g. a reset), and reset carried-over fuel.
+        lastOdo = currOdo
+        pendingLitres = 0.0
+        pendingCount = 0
+    }
+    return segments
+}
+
 fun List<FillUp>.toLifetimeSummary(): LifetimeSummary {
     val totalSpentCents = sumOf { it.totalCostCents }
     val totalLitres = sumOf { it.litres }
 
-    val sortedAsc = sortedBy { it.dateEpochDay }
-    var kmDriven = 0L
-    var consumedLitres = 0.0
-    var hasPair = false
-    for (i in 1 until sortedAsc.size) {
-        val prev = sortedAsc[i - 1]
-        val curr = sortedAsc[i]
-        val prevOdo = prev.odometerKm
-        val currOdo = curr.odometerKm
-        if (prevOdo != null && currOdo != null && currOdo > prevOdo) {
-            kmDriven += currOdo - prevOdo
-            consumedLitres += curr.litres
-            hasPair = true
-        }
-    }
+    val segments = efficiencySegments()
+    val kmDriven = segments.sumOf { it.distanceKm }
+    val consumedLitres = segments.sumOf { it.litres }
+    val hasPair = segments.isNotEmpty()
 
     return LifetimeSummary(
         totalSpentCents = totalSpentCents,
@@ -110,16 +159,13 @@ fun List<FillUp>.toLifetimeSummary(): LifetimeSummary {
 }
 
 fun List<FillUp>.withEfficiency(): List<FillUpWithEfficiency> {
-    val sortedAsc = sortedBy { it.dateEpochDay }
-    val efficiencyById = HashMap<Long, Double>()
-    for (i in 1 until sortedAsc.size) {
-        val prev = sortedAsc[i - 1]
-        val curr = sortedAsc[i]
-        val prevOdo = prev.odometerKm
-        val currOdo = curr.odometerKm
-        if (prevOdo != null && currOdo != null && currOdo > prevOdo) {
-            efficiencyById[curr.id] = curr.litres / (currOdo - prevOdo) * 100.0
-        }
+    val segmentById = efficiencySegments().associateBy { it.fillUpId }
+    return map { entry ->
+        val segment = segmentById[entry.id]
+        FillUpWithEfficiency(
+            fillUp = entry,
+            lPer100km = segment?.lPer100km,
+            fillsCovered = segment?.fillsCovered ?: 1,
+        )
     }
-    return map { FillUpWithEfficiency(it, efficiencyById[it.id]) }
 }

@@ -21,6 +21,9 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Sign with the debug keystore so the release variant is installable locally.
+            // Replace with a real release keystore before publishing.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -35,6 +38,19 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    lint {
+        // Run lint on release builds and fail the build on errors, so command-line
+        // builds behave the same as Android Studio.
+        checkReleaseBuilds = true
+        abortOnError = true
+        // Dependency-version currency is advisory, not a correctness issue; upgrading
+        // across major versions is handled deliberately, not on every build.
+        disable += setOf("GradleDependency", "AndroidGradlePluginVersion")
+        // The adaptive launcher icon lives only in mipmap-anydpi-v26 with no PNG
+        // density fallbacks, so the v26 qualifier is required despite minSdk 26.
+        disable += "ObsoleteSdkInt"
     }
 }
 
@@ -62,4 +78,6 @@ dependencies {
 
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
+
+    testImplementation(libs.junit)
 }

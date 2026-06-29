@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.gastracker.data.FillUp
+import com.example.gastracker.data.FillUpWithEfficiency
 import com.example.gastracker.data.HistorySection
 import com.example.gastracker.data.LifetimeSummary
 import com.example.gastracker.data.MonthSummary
@@ -69,12 +70,12 @@ import kotlin.math.abs
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
+// Pattern-only ofPattern uses the default FORMAT locale at creation.
 private val monthFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("MMMM", Locale.getDefault())
+    DateTimeFormatter.ofPattern("MMMM")
 private val chartDateFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
+    DateTimeFormatter.ofPattern("MMM d")
 
 private enum class TimeWindow(val label: String, val days: Int?) {
     Days30("30d", 30),
@@ -87,6 +88,7 @@ private enum class TimeWindow(val label: String, val days: Int?) {
 @Composable
 fun StatsScreen(
     fillUps: List<FillUp>,
+    efficiency: List<FillUpWithEfficiency>,
     history: List<HistorySection>,
     lifetime: LifetimeSummary,
 ) {
@@ -136,6 +138,7 @@ fun StatsScreen(
             item { SummaryCardsRow(thisMonth = thisMonth, thisYear = thisYear) }
             item { LifetimeRow(lifetime = lifetime) }
             item { ChartCard(fillUps = fillUps) }
+            item { EfficiencyChartCard(efficiency = efficiency) }
 
             item {
                 Text(
@@ -377,6 +380,99 @@ private fun ChartCard(fillUps: List<FillUp>) {
 
                 Spacer(modifier = Modifier.height(6.dp))
                 ChartLegend()
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EfficiencyChartCard(efficiency: List<FillUpWithEfficiency>) {
+    var window by rememberSaveable { mutableStateOf(TimeWindow.All) }
+
+    // Only fill-ups that produced an efficiency measurement, sorted chronologically.
+    val points = remember(efficiency, window) {
+        val cutoff = window.days?.let { LocalDate.now().minusDays(it.toLong()).toEpochDay() }
+        efficiency
+            .filter { it.lPer100km != null }
+            .filter { cutoff == null || it.fillUp.dateEpochDay >= cutoff }
+            .sortedBy { it.fillUp.dateEpochDay }
+    }
+    val baseDay = remember(points) { points.firstOrNull()?.fillUp?.dateEpochDay ?: 0L }
+    val xValues = remember(points) { points.map { (it.fillUp.dateEpochDay - baseDay).toFloat() } }
+    val effSeries = remember(points) { points.map { it.lPer100km!! } }
+
+    val modelProducer = remember { CartesianChartModelProducer() }
+    LaunchedEffect(points) {
+        if (points.size < 2) return@LaunchedEffect
+        modelProducer.runTransaction {
+            lineSeries { series(x = xValues, y = effSeries) }
+        }
+    }
+
+    Card(elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    "Efficiency (L/100km)",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                TimeWindowSelector(selected = window, onSelect = { window = it })
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (points.size < 2) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "Add odometer readings to two or more fill-ups in this window.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                val effLine = LineCartesianLayer.rememberLine(
+                    fill = LineCartesianLayer.LineFill.single(fill(ChartGold)),
+                )
+                val effFormatter = CartesianValueFormatter { _, value, _ -> "%.1f".format(value) }
+                val dateFormatter = CartesianValueFormatter { _, value, _ ->
+                    val date = LocalDate.ofEpochDay(baseDay + value.toLong())
+                    chartDateFormatter.format(date)
+                }
+                val bottomSpacing = (xValues.size / 5).coerceAtLeast(1)
+                val tightRange = remember { TightRangeProvider() }
+
+                CartesianChartHost(
+                    chart = rememberCartesianChart(
+                        rememberLineCartesianLayer(
+                            lineProvider = LineCartesianLayer.LineProvider.series(effLine),
+                            rangeProvider = tightRange,
+                            verticalAxisPosition = Axis.Position.Vertical.Start,
+                        ),
+                        startAxis = VerticalAxis.rememberStart(
+                            valueFormatter = effFormatter,
+                        ),
+                        bottomAxis = HorizontalAxis.rememberBottom(
+                            valueFormatter = dateFormatter,
+                            itemPlacer = remember(bottomSpacing) {
+                                HorizontalAxis.ItemPlacer.aligned(spacing = { bottomSpacing })
+                            },
+                        ),
+                    ),
+                    modelProducer = modelProducer,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    scrollState = rememberVicoScrollState(),
+                )
             }
         }
     }

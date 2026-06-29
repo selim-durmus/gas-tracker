@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Pre-Android 12 backup rules (referenced via android:fullBackupContent).
-  Auto-backup includes everything by default; we explicitly include databases/
-  and exclude transient cache so cloud backups don't carry CSV export files.
+  Specifying <include> restricts auto-backup to only these locations, so the Room
+  database and shared prefs are backed up while everything else (the cache dir used
+  for CSV exports, external storage) is excluded automatically.
 -->
 <full-backup-content>
     <include domain="database" path="." />
     <include domain="sharedpref" path="." />
-    <exclude domain="external" path="." />
-    <exclude domain="cache" path="." />
 </full-backup-content>

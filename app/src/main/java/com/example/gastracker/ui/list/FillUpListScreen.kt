@@ -2,6 +2,8 @@ package com.example.gastracker.ui.list
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,11 +12,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -35,7 +42,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.lerp
@@ -49,10 +59,12 @@ import com.example.gastracker.data.shareCsvExport
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
 import java.util.Locale
 
+// Pattern-only ofPattern uses the default FORMAT locale at creation.
 private val dateFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.getDefault())
+    DateTimeFormatter.ofPattern("MMM d, yyyy")
 
 private const val UNDO_TIMEOUT_MS = 2_000L
 
@@ -127,17 +139,65 @@ fun FillUpListScreen(
                 )
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-            ) {
-                items(fillUps, key = { it.fillUp.id }) { item ->
-                    SwipeableRow(
-                        fillUp = item.fillUp,
-                        efficiency = item.lPer100km,
-                        onClick = { onRowClick(item.fillUp) },
-                        onDismiss = { onDelete(item.fillUp) },
-                    )
-                    HorizontalDivider()
+            var selectedYear by rememberSaveable { mutableStateOf<Int?>(null) }
+            var selectedMonth by rememberSaveable { mutableStateOf<Int?>(null) }
+
+            val years = remember(fillUps) {
+                fillUps.map { it.fillUp.date.year }.distinct().sortedDescending()
+            }
+            // Months available within the selected year (descending). Empty when no year picked.
+            val months = remember(fillUps, selectedYear) {
+                selectedYear?.let { yr ->
+                    fillUps.filter { it.fillUp.date.year == yr }
+                        .map { it.fillUp.date.monthValue }
+                        .distinct()
+                        .sortedDescending()
+                } ?: emptyList()
+            }
+            // Keep the month selection valid when the year changes.
+            LaunchedEffect(selectedYear, months) {
+                if (selectedMonth != null && selectedMonth !in months) selectedMonth = null
+            }
+
+            val filtered = remember(fillUps, selectedYear, selectedMonth) {
+                fillUps.filter { item ->
+                    val d = item.fillUp.date
+                    (selectedYear == null || d.year == selectedYear) &&
+                        (selectedMonth == null || d.monthValue == selectedMonth)
+                }
+            }
+
+            Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+                FilterBar(
+                    years = years,
+                    months = months,
+                    selectedYear = selectedYear,
+                    selectedMonth = selectedMonth,
+                    onYearSelected = { selectedYear = it },
+                    onMonthSelected = { selectedMonth = it },
+                )
+                if (filtered.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            "No fill-ups for this period.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(filtered, key = { it.fillUp.id }) { item ->
+                            SwipeableRow(
+                                item = item,
+                                onClick = { onRowClick(item.fillUp) },
+                                onDismiss = { onDelete(item.fillUp) },
+                            )
+                            HorizontalDivider()
+                        }
+                    }
                 }
             }
         }
@@ -146,9 +206,85 @@ fun FillUpListScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun FilterBar(
+    years: List<Int>,
+    months: List<Int>,
+    selectedYear: Int?,
+    selectedMonth: Int?,
+    onYearSelected: (Int?) -> Unit,
+    onMonthSelected: (Int?) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilterDropdown(
+            label = selectedYear?.toString() ?: "All years",
+            active = selectedYear != null,
+            options = buildList {
+                add(null to "All years")
+                years.forEach { add(it to it.toString()) }
+            },
+            onSelect = onYearSelected,
+        )
+        FilterDropdown(
+            label = selectedMonth?.let { monthName(it) } ?: "All months",
+            active = selectedMonth != null,
+            enabled = selectedYear != null && months.isNotEmpty(),
+            options = buildList {
+                add(null to "All months")
+                months.forEach { add(it to monthName(it)) }
+            },
+            onSelect = onMonthSelected,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterDropdown(
+    label: String,
+    active: Boolean,
+    options: List<Pair<Int?, String>>,
+    onSelect: (Int?) -> Unit,
+    enabled: Boolean = true,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        FilterChip(
+            selected = active,
+            enabled = enabled,
+            onClick = { expanded = true },
+            label = { Text(label) },
+            trailingIcon = {
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            },
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { (value, text) ->
+                DropdownMenuItem(
+                    text = { Text(text) },
+                    onClick = {
+                        onSelect(value)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+private fun monthName(month: Int): String =
+    java.time.Month.of(month).getDisplayName(TextStyle.FULL, Locale.getDefault())
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun SwipeableRow(
-    fillUp: FillUp,
-    efficiency: Double?,
+    item: FillUpWithEfficiency,
     onClick: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -189,12 +325,14 @@ private fun SwipeableRow(
             }
         },
     ) {
-        FillUpRow(fillUp = fillUp, efficiency = efficiency, onClick = onClick)
+        FillUpRow(item = item, onClick = onClick)
     }
 }
 
 @Composable
-private fun FillUpRow(fillUp: FillUp, efficiency: Double?, onClick: () -> Unit) {
+private fun FillUpRow(item: FillUpWithEfficiency, onClick: () -> Unit) {
+    val fillUp = item.fillUp
+    val efficiency = item.lPer100km
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -216,6 +354,8 @@ private fun FillUpRow(fillUp: FillUp, efficiency: Double?, onClick: () -> Unit) 
                 append(" L")
                 if (efficiency != null) {
                     append(" · ")
+                    // A tilde flags an averaged reading that spans a partial fill.
+                    if (item.isCombined) append("~")
                     append("%.1f".format(efficiency))
                     append(" L/100km")
                 }
@@ -225,6 +365,13 @@ private fun FillUpRow(fillUp: FillUp, efficiency: Double?, onClick: () -> Unit) 
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (item.isCombined) {
+                Text(
+                    text = "combined over ${item.fillsCovered} fills since last odometer reading",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         Text(
             text = fillUp.totalCost.format(),
