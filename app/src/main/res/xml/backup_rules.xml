@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Pre-Android 12 backup rules (referenced via android:fullBackupContent).
-  Specifying <include> restricts auto-backup to only these locations, so the Room
-  database and shared prefs are backed up while everything else (the cache dir used
-  for CSV exports, external storage) is excluded automatically.
--->
+<!-- Android 11 and older: back up the database and pre-import snapshots, nothing else. -->
 <full-backup-content>
     <include domain="database" path="." />
-    <include domain="sharedpref" path="." />
+    <include domain="file" path="backups/" />
 </full-backup-content>

@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Gas Tracker</string>
-    <string name="widget_compact_description">Gas Tracker (compact) — this month\'s total</string>
-    <string name="widget_wide_description">Gas Tracker (wide) — this month\'s total and litres</string>
-    <string name="widget_efficiency_description">Gas Tracker (efficiency) — this month\'s total with L/100km</string>
-    <string name="widget_loading">Loading…</string>
+    <string name="import_into_app">Import into Gas Tracker</string>
+    <string name="widget_compact_label">Gas spend</string>
+    <string name="widget_wide_label">Gas spend &amp; litres</string>
+    <string name="widget_economy_label">Gas spend &amp; economy</string>
+    <string name="widget_compact_description">This month\'s fuel spend</string>
+    <string name="widget_wide_description">This month\'s fuel spend, litres and fill-ups</string>
+    <string name="widget_economy_description">This month\'s fuel spend with your average L/100km</string>
+    <string name="widget_loading">Gas Tracker…</string>
 </resources>
