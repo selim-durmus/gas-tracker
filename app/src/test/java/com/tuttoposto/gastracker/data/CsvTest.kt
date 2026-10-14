@@ -48,6 +48,7 @@ class CsvTest {
             FillUp(1, LocalDate.of(2026, 9, 28).toEpochDay(), 1699, 3000, 214841, fullTank = false, note = "Costco, \"quick\" top-up"),
             FillUp(2, LocalDate.of(2026, 10, 2).toEpochDay(), 1359, 5915, 214970, note = "line one\nline two"),
             FillUp(3, LocalDate.of(2026, 10, 2).toEpochDay(), 1001, 1, null),
+            FillUp(4, LocalDate.of(2026, 10, 9).toEpochDay(), 1500, 6000, 216000, missedPrevious = true),
         )
         val parsed = Csv.parse(Csv.format(entries))
         assertTrue(parsed.errors.isEmpty())
@@ -67,7 +68,7 @@ class CsvTest {
     fun `export uses dot decimals even on a comma-decimal locale`() {
         Locale.setDefault(Locale.ITALY)
         val csv = Csv.format(listOf(FillUp(1, LocalDate.of(2026, 1, 1).toEpochDay(), 1799, 4550)))
-        assertEquals("2026-01-01,1.799,45.50,25.292,,yes,", csv.lines()[1])
+        assertEquals("2026-01-01,1.799,45.50,25.292,,yes,no,", csv.lines()[1])
         assertEquals(1, Csv.parse(csv).rows.size)
     }
 
@@ -106,6 +107,16 @@ class CsvTest {
         val r = Csv.parse("date,price,total,full_tank\n10/2/2026,1.36,59.15,no\n")
         assertEquals(LocalDate.of(2026, 10, 2).toEpochDay(), r.rows.single().dateEpochDay)
         assertFalse(r.rows.single().fullTank)
+    }
+
+    @Test
+    fun `exports from before the missed-fill column still import`() {
+        val r = Csv.parse(
+            "date,price_per_litre,total_cost,litres,odometer_km,full_tank,note\n" +
+                "2026-10-02,1.360,59.15,43.493,214970,yes,\n",
+        )
+        assertFalse(r.rows.single().missedPrevious)
+        assertTrue(r.rows.single().fullTank)
     }
 
     @Test

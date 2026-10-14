@@ -164,7 +164,9 @@ fun EditScreen(viewModel: EditViewModel, onClose: () -> Unit) {
                 title = "Filled to the top",
                 body = when {
                     state.partialHint == PartialHint.LowReading ->
-                        "That's much less fuel than usual for this distance. If you didn't fill to the top, turn this off."
+                        "That's much less fuel than usual for this distance. If you didn't fill to the top, " +
+                            "turn this off. If you forgot to log a fill-up before this one, add it, or use " +
+                            "\"Missed a fill-up\" below."
                     state.partialHint == PartialHint.NextReadingHigh ->
                         "The next fill used far more fuel than usual, so this one probably wasn't full. If so, turn this off."
                     state.draft.fullTank -> "Economy is measured from one full tank to the next."
@@ -173,6 +175,27 @@ fun EditScreen(viewModel: EditViewModel, onClose: () -> Unit) {
                 checked = state.draft.fullTank,
                 onChange = { v -> viewModel.update { it.copy(fullTank = v) } },
                 warning = state.partialHint != null,
+                tag = "full_tank",
+            )
+
+            val gap = state.longGapKm
+            ToggleRow(
+                title = "Missed a fill-up before this one",
+                body = when {
+                    state.draft.missedPrevious ->
+                        "This fill won't get an economy reading; measuring starts fresh from here. " +
+                            "Spending totals aren't affected."
+                    gap != null ->
+                        "${formatKm(gap)} is much further than you usually drive between fill-ups. Forgot to " +
+                            "log one? Add it if you know the amount, otherwise turn this on so it doesn't " +
+                            "skew your economy."
+                    else -> "Forgot to log a fill-up? Add it if you know the amount. If not, turn this on " +
+                        "to skip the one economy reading it would throw off."
+                },
+                checked = state.draft.missedPrevious,
+                onChange = { v -> viewModel.update { it.copy(missedPrevious = v) } },
+                warning = gap != null,
+                tag = "missed_previous",
             )
 
             DateRow(date = state.draft.date, onClick = { pickDate = true })
@@ -315,7 +338,14 @@ private fun OdometerField(state: EditState, onValueChange: (String) -> Unit) {
 }
 
 @Composable
-private fun ToggleRow(title: String, body: String, checked: Boolean, onChange: (Boolean) -> Unit, warning: Boolean) {
+private fun ToggleRow(
+    title: String,
+    body: String,
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+    warning: Boolean,
+    tag: String,
+) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
@@ -328,7 +358,7 @@ private fun ToggleRow(title: String, body: String, checked: Boolean, onChange: (
                 .fillMaxWidth()
                 .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
-                .testTag("full_tank"),
+                .testTag(tag),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
@@ -337,7 +367,7 @@ private fun ToggleRow(title: String, body: String, checked: Boolean, onChange: (
                     body,
                     style = MaterialTheme.typography.bodySmall,
                     color = if (warning) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag("full_tank_hint"),
+                    modifier = Modifier.testTag("${tag}_hint"),
                 )
             }
             Spacer(Modifier.width(12.dp))

@@ -272,7 +272,8 @@ private fun FillUpCard(row: LogRow, onClick: () -> Unit) {
         append(", ").append(formatLitres(f.litres)).append(" at ").append(formatPrice(f.pricePerLitreMills)).append(" per litre")
         if (seg != null) append(", ").append(formatEfficiency(seg.lPer100km)).append(" litres per 100 kilometres")
         if (!f.fullTank) append(", partial fill")
-        if (row.partialHint != null) append(", may have been a partial fill")
+        if (row.partialHint != null) append(", economy reading looks off: partial or missed fill-up?")
+        if (f.missedPrevious) append(", follows a missed fill-up")
     }
     Card(
         modifier = Modifier
@@ -303,10 +304,13 @@ private fun FillUpCard(row: LogRow, onClick: () -> Unit) {
                     }
                     if (row.partialHint != null) {
                         Pill(
-                            "Partial?",
+                            "Check fill",
                             container = MaterialTheme.colorScheme.errorContainer,
                             content = MaterialTheme.colorScheme.onErrorContainer,
                         )
+                    }
+                    if (f.missedPrevious) {
+                        Pill("After gap", container = MaterialTheme.colorScheme.surfaceContainerHighest, content = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (!f.fullTank) {
                         Pill("Partial", container = MaterialTheme.colorScheme.surfaceContainerHighest, content = MaterialTheme.colorScheme.onSurfaceVariant)

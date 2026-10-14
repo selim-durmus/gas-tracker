@@ -123,6 +123,54 @@ class StatsTest {
     }
 
     @Test
+    fun `a forgotten fill-up gives one reading that is far too low`() {
+        // Drop the Sep 20 fill as if it was never logged: Sep 12 -> Sep 28 spans 1,132 km on 17.75 L.
+        val forgot = fullLog.filter { it.id != 12L }.map { if (it.id == 13L) it.copy(fullTank = false) else it }
+        val readings = forgot.efficiencySegments().associate { it.endFillUpId to it.lPer100km }
+        assertTrue("Oct 2 reading ${readings[14]}", readings[14]!! < 6.0)
+        // Earlier readings are untouched.
+        assertEquals(fullLog.efficiencySegments().first { it.endFillUpId == 11L }.lPer100km, readings[11]!!, 1e-9)
+        // And the detector notices it.
+        assertEquals(PartialHint.LowReading, forgot.partialFillSuspects()[14])
+    }
+
+    @Test
+    fun `marking the next fill as after a missed fill-up skips just that reading`() {
+        val forgot = fullLog.filter { it.id != 12L }.map {
+            when (it.id) {
+                13L -> it.copy(fullTank = false, missedPrevious = true) // first fill after the gap
+                else -> it
+            }
+        }
+        val segs = forgot.efficiencySegments()
+        // Sep 28 is partial and follows the gap, so the baseline waits for the next full reading
+        // (Oct 2), which therefore gets no reading either. Nothing absurd is produced.
+        assertTrue(segs.none { it.endFillUpId == 13L || it.endFillUpId == 14L })
+        assertTrue(segs.all { it.lPer100km in 5.0..11.0 })
+        assertTrue(forgot.partialFillSuspects().isEmpty())
+    }
+
+    @Test
+    fun `a full fill after a gap starts a fresh baseline so the next tank is measured`() {
+        val log = fullLog.filter { it.id != 12L }.map {
+            when (it.id) {
+                13L -> it.copy(missedPrevious = true)   // Sep 28 treated as full, after the gap
+                else -> it
+            }
+        }
+        val segs = log.efficiencySegments().associateBy { it.endFillUpId }
+        assertNull(segs[13])                          // the reading spanning the gap is skipped
+        assertEquals(13L, segs[14]!!.startFillUpId)   // Oct 2 is measured from Sep 28
+        assertEquals(129L, segs[14]!!.distanceKm)
+    }
+
+    @Test
+    fun `a missed fill-up does not change spending totals`() {
+        val flagged = fullLog.map { if (it.id == 14L) it.copy(missedPrevious = true) else it }
+        assertEquals(fullLog.summary(), flagged.summary())
+    }
+
+    @Test
     fun `a high reading points at the fill it started from`() {
         // Six normal ~8 L/100km tanks, then one starting from a fill that wasn't really full.
         val normal = (0 until 6).map { i ->

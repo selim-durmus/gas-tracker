@@ -125,6 +125,44 @@ class AppFlowTest {
     }
 
     @Test
+    fun aLongGapSuggestsAMissedFillUpAndTheSwitchSkipsThatReading() {
+        runBlocking {
+            // Four tanks of ~490 km each, ending at 211,889 km.
+            listOf(
+                Triple("2026-06-25", 6666L, 210415L), Triple("2026-07-06", 6871L, 210898L),
+                Triple("2026-07-15", 7100L, 211406L), Triple("2026-07-27", 7690L, 211889L),
+            ).forEach { (d, cents, odo) ->
+                app.repository.upsert(
+                    com.tuttoposto.gastracker.data.FillUp(
+                        dateEpochDay = java.time.LocalDate.parse(d).toEpochDay(),
+                        pricePerLitreMills = 1550, totalCostCents = cents, odometerKm = odo,
+                    ),
+                )
+            }
+        }
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        compose.onNodeWithTag("add_fill_up").performClick()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("New fill-up")).fetchSemanticsNodes().isNotEmpty() }
+        // One normal tank's worth of fuel after ~1,000 km: a fill-up in between was never logged.
+        compose.onNodeWithTag("price").performTextInput("1550")
+        compose.onNodeWithTag("total").performTextInput("70")
+        compose.onNodeWithTag("odometer").performTextInput("212889")
+        compose.onNodeWithTag("missed_previous_hint", useUnmergedTree = true)
+            .assertTextContains("much further than you usually drive", substring = true)
+        compose.onNodeWithTag("full_tank_hint", useUnmergedTree = true)
+            .assertTextContains("forgot to log a fill-up", substring = true)
+        compose.onNodeWithTag("missed_previous").performClick()
+        compose.onNodeWithTag("missed_previous_hint", useUnmergedTree = true)
+            .assertTextContains("measuring starts fresh from here", substring = true)
+        compose.onNodeWithTag("save").performClick()
+        compose.waitUntil(5_000) { count() == 5 }
+        val saved = runBlocking { app.repository.getAll().maxBy { it.dateEpochDay } }
+        assertEquals(true, saved.missedPrevious)
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("After gap")).fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(0, compose.onAllNodes(hasText("Check fill")).fetchSemanticsNodes().size)
+    }
+
+    @Test
     fun aCsvSharedFromTheOldAppIsPreviewedThenImported() {
         val dir = File(context.cacheDir, "exports").apply { mkdirs() }
         val file = File(dir, "gas-tracker-2026-10-11.csv").apply {

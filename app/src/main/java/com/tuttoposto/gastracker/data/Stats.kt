@@ -54,6 +54,17 @@ fun List<FillUp>.efficiencySegments(): List<EfficiencySegment> {
     for (entry in chronological()) {
         val odo = entry.odometerKm
         val closesSegment = entry.fullTank && odo != null
+        if (entry.missedPrevious) {
+            // A fill-up before this one was never logged, so the fuel since the baseline is
+            // incomplete and any reading ending here would be far too low. Skip it and measure
+            // fresh from this fill (or from the next full reading if this one can't start one).
+            baselineOdo = if (closesSegment) odo else null
+            baselineId = entry.id
+            litres = 0.0
+            cost = 0L
+            fills = 0
+            continue
+        }
         if (baselineOdo == null) {
             // Fuel bought before the first full reading can't be attributed to any distance.
             if (closesSegment) {

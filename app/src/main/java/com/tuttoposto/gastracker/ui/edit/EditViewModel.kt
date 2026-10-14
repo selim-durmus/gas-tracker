@@ -7,6 +7,7 @@ import com.tuttoposto.gastracker.data.FillUp
 import com.tuttoposto.gastracker.data.FillUpRepository
 import com.tuttoposto.gastracker.data.PartialHint
 import com.tuttoposto.gastracker.data.chronological
+import com.tuttoposto.gastracker.data.efficiencySegments
 import com.tuttoposto.gastracker.data.partialFillSuspects
 import com.tuttoposto.gastracker.data.parseCents
 import com.tuttoposto.gastracker.data.parseMills
@@ -25,6 +26,7 @@ data class Draft(
     val odometer: String = "",
     val fullTank: Boolean = true,
     val note: String = "",
+    val missedPrevious: Boolean = false,
 )
 
 data class EditState(
@@ -41,6 +43,11 @@ data class EditState(
     val missing: Boolean = false,
     /** Set while the draft is marked full but its economy says the tank probably wasn't. */
     val partialHint: PartialHint? = null,
+    /**
+     * Set to the distance since the last reading when it's far beyond the usual distance per
+     * fill-up, which usually means a fill-up was never logged.
+     */
+    val longGapKm: Long? = null,
 ) {
     val priceMills: Long? get() = parseMills(draft.price)?.takeIf { it > 0 }
     val totalCents: Long? get() = parseCents(draft.total)?.takeIf { it > 0 }
@@ -76,6 +83,7 @@ class EditViewModel(
     private val id: Long = savedStateHandle.get<Long>(ARG_ID)?.takeIf { it > 0 } ?: 0L
     private var existing: FillUp? = null
     private var all: List<FillUp> = emptyList()
+    private var typicalDistanceKm: Long? = null
 
     private val _state = MutableStateFlow(EditState(isNew = id == 0L))
     val state: StateFlow<EditState> = _state.asStateFlow()
@@ -83,6 +91,7 @@ class EditViewModel(
     init {
         viewModelScope.launch {
             all = repository.getAll()
+            typicalDistanceKm = medianTankDistance()
             val entry = if (id != 0L) repository.getById(id) else null
             if (id != 0L && entry == null) {
                 _state.update { it.copy(loaded = true, missing = true) }
@@ -97,7 +106,7 @@ class EditViewModel(
                     initial = draft,
                     previousWithOdometer = previousFor(draft.date),
                     partialHint = hintFor(draft),
-                )
+                ).withGapCheck()
             }
         }
     }
@@ -109,7 +118,7 @@ class EditViewModel(
                 draft = next,
                 previousWithOdometer = if (next.date != s.draft.date) previousFor(next.date) else s.previousWithOdometer,
                 partialHint = hintFor(next),
-            )
+            ).withGapCheck()
         }
     }
 
@@ -131,6 +140,7 @@ class EditViewModel(
             odometerKm = s.odometerKm,
             fullTank = s.draft.fullTank,
             note = s.draft.note.trim(),
+            missedPrevious = s.draft.missedPrevious,
         )
         viewModelScope.launch {
             repository.upsert(entity)
@@ -150,7 +160,7 @@ class EditViewModel(
 
     /** Runs the log's partial-fill check with this draft in place of the stored entry. */
     private fun hintFor(draft: Draft): PartialHint? {
-        if (!draft.fullTank) return null
+        if (!draft.fullTank || draft.missedPrevious) return null
         val price = parseMills(draft.price)?.takeIf { it > 0 } ?: return null
         val total = parseCents(draft.total)?.takeIf { it > 0 } ?: return null
         val me = FillUp(
@@ -161,6 +171,27 @@ class EditViewModel(
             odometerKm = draft.odometer.toLongOrNull(),
         )
         return (all.filter { it.id != id } + me).partialFillSuspects()[me.id]
+    }
+
+    /** Median distance of the log's single-tank economy readings; null until there are three. */
+    private fun medianTankDistance(): Long? {
+        val d = all.filter { it.id != id }.efficiencySegments()
+            .filter { it.fillsCovered == 1 }
+            .map { it.distanceKm }
+            .sorted()
+        return if (d.size < 3) null else d[d.size / 2]
+    }
+
+    private fun EditState.withGapCheck(): EditState {
+        val distance = distanceSincePrevious
+        val typical = typicalDistanceKm
+        val prev = previousWithOdometer
+        if (draft.missedPrevious || distance == null || typical == null || prev == null) return copy(longGapKm = null)
+        // Fills logged without a reading in between legitimately stretch the distance.
+        val day = draft.date.toEpochDay()
+        val between = all.count { it.id != id && it.id != prev.id && it.dateEpochDay in prev.dateEpochDay..day }
+        val limit = typical * GAP_RATIO * (1 + between)
+        return copy(longGapKm = distance.takeIf { it > limit })
     }
 
     /** Nearest entry before [date] (same-day entries count if older) that has an odometer reading. */
@@ -174,6 +205,7 @@ class EditViewModel(
 
     companion object {
         const val ARG_ID = "id"
+        private const val GAP_RATIO = 1.8
     }
 }
 
@@ -184,4 +216,5 @@ private fun FillUp.toDraft() = Draft(
     odometer = odometerKm?.toString().orEmpty(),
     fullTank = fullTank,
     note = note,
+    missedPrevious = missedPrevious,
 )

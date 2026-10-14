@@ -9,7 +9,7 @@ import java.util.Locale
  * CSV import/export.
  *
  * Export writes the v2 format, oldest first:
- *   date,price_per_litre,total_cost,litres,odometer_km,full_tank,note
+ *   date,price_per_litre,total_cost,litres,odometer_km,full_tank,missed_previous,note
  *
  * Import is header-driven and also reads the v1 export
  * (date,price_per_liter_usd,total_cost_usd,litres,odometer_km), so data from the old app
@@ -17,7 +17,7 @@ import java.util.Locale
  * litres but no price gets its price derived instead.
  */
 object Csv {
-    const val HEADER = "date,price_per_litre,total_cost,litres,odometer_km,full_tank,note"
+    const val HEADER = "date,price_per_litre,total_cost,litres,odometer_km,full_tank,missed_previous,note"
     const val MIME = "text/csv"
     private val BOM = Char(0xFEFF).toString()
 
@@ -30,6 +30,7 @@ object Csv {
             append(String.format(Locale.ROOT, "%.3f", e.litres)).append(',')
             append(e.odometerKm?.toString() ?: "").append(',')
             append(if (e.fullTank) "yes" else "no").append(',')
+            append(if (e.missedPrevious) "yes" else "no").append(',')
             append(quote(e.note)).append('\n')
         }
     }
@@ -50,6 +51,7 @@ object Csv {
     private val litresColumns = setOf("litres", "liters", "volume", "litres_l")
     private val odoColumns = setOf("odometer_km", "odometer", "odo", "km")
     private val fullColumns = setOf("full_tank", "full", "fulltank")
+    private val missedColumns = setOf("missed_previous", "missed_fill_before")
     private val noteColumns = setOf("note", "notes", "comment")
 
     private val dateFormats = listOf(
@@ -72,6 +74,7 @@ object Csv {
         val litresCol = col(litresColumns)
         val odoCol = col(odoColumns)
         val fullCol = col(fullColumns)
+        val missedCol = col(missedColumns)
         val noteCol = col(noteColumns)
         if (dateCol == null || totalCol == null || (priceCol == null && litresCol == null)) {
             throw FormatException(
@@ -122,6 +125,7 @@ object Csv {
                 odometerKm = odo,
                 fullTank = full,
                 note = field(noteCol),
+                missedPrevious = field(missedCol).lowercase(Locale.ROOT) in setOf("yes", "y", "true", "1"),
             )
         }
         val legacy = "price_per_liter_usd" in header || "total_cost_usd" in header

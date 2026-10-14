@@ -1,5 +1,6 @@
 package com.tuttoposto.gastracker.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -26,6 +27,11 @@ data class FillUp(
     /** False when the tank wasn't filled to the top; its fuel rolls into the next full fill. */
     val fullTank: Boolean = true,
     val note: String = "",
+    /**
+     * True when a fill-up before this one was never logged. The economy reading that would end
+     * here is skipped (it would miss that fuel), and measuring starts fresh from this fill.
+     */
+    @ColumnInfo(defaultValue = "0") val missedPrevious: Boolean = false,
 ) {
     val date: LocalDate get() = LocalDate.ofEpochDay(dateEpochDay)
 
